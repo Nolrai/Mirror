@@ -21,12 +21,13 @@ import Control.Mirror.Type.Parse as Parse
 
 data Sign = Pos | Neg
   deriving (Read, Show, Ord, Eq, Enum, Bounded)
-
 instance Alpha Sign
 
 -- like Sign but for if a factor is > or < 1
+-- A Sigil is either Gro[w] or Shr[ink]
 data Sigil = Gro | Shr
   deriving (Read, Show, Ord, Eq, Enum, Bounded)
+instance Alpha Sigil
 
 type Sum a = [(Sign, a)]
 
@@ -36,7 +37,7 @@ type Var = Name Exp
 
 data Exp where
   Atom :: Var -> Exp
-  PofS :: (Sum Exp) -> Exp
+  PofS :: Prod (Sum Exp) -> Exp
   deriving (Show, Ord, Eq)
 
 newtype Poly = Poly (Bind [Var] Exp)
@@ -45,12 +46,18 @@ newtype Full = Full (Bind [Var] (Exp, Exp))
 
 data Node a = Node a Full
 
-$(derive [''Poly, ''Full, ''Node, ''Exp])
+$(derive [''Sigil, ''Sign, ''Poly, ''Full, ''Node, ''Exp])
 
 instance Alpha Exp
 instance Alpha Poly
 instance Alpha Full
 instance Alpha a => Alpha (Node a)
+
+instance Subst Exp Sign where
+  isvar _ = Nothing
+
+instance Subst Exp Sigil where
+  isvar _ = Nothing
 
 instance Subst Exp Exp where
   isvar (Atom v) = Just $ SubstName v
