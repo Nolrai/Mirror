@@ -20,40 +20,47 @@ import Data.Either (Either(..))
 import Control.Mirror.Type.Parse as Parse
 
 data Sign = Pos | Neg
+  deriving (Read, Show, Ord, Eq, Enum, Bounded)
+
+instance Alpha Sign
+
 -- like Sign but for if a factor is > or < 1
 data Sigil = Gro | Shr
+  deriving (Read, Show, Ord, Eq, Enum, Bounded)
 
-newtype Sum a = Sum [(Sign, a)]
-  deriving (Functor, Traversable, Read, Show, Ord, Eq)
-newtype Prod a = Prod [(Sigil, a)]
-  deriving (Functor, Traversable, Read, Show, Ord, Eq)
+type Sum a = [(Sign, a)]
 
+type Prod a = [(Sigil, a)]
 
-newtype TYPE a = Atom a | PofS Prod (Sum (TYPE a))
-  deriving (Functor, Traversable, Read, Show, Ord, Eq)
+type Var = Name Exp
 
-newtype Var = Var (Name TypeExp)
-  deriving (Show, Ord, Eq, Alpha)
+data Exp where
+  Atom :: Var -> Exp
+  PofS :: (Sum Exp) -> Exp
+  deriving (Show, Ord, Eq)
 
-newtype TypeExp = TypeExp (TYPE Var)
-newtype PolyType = PolyType (Bind [Var] TypeExp)
-newtype FullType = FullType (Bind [Var] (TypeExp, TypeExp))
-data Node a = Node a FullType
+newtype Poly = Poly (Bind [Var] Exp)
 
-$(derive [''Var, ''TypeExp, ''PolyType, ''FullType, ''Node])
+newtype Full = Full (Bind [Var] (Exp, Exp))
 
-instance Alpha TypeExp
-instance Alpha PolyType
-instance Alpha FullType
-instance Alpha Node
+data Node a = Node a Full
 
-instance Subst TypeExp TypeExp where
-  isvar (Atom (Var v)) = Just $ SubstName v
+$(derive [''Poly, ''Full, ''Node, ''Exp])
+
+instance Alpha Exp
+instance Alpha Poly
+instance Alpha Full
+instance Alpha a => Alpha (Node a)
+
+instance Subst Exp Exp where
+  isvar (Atom v) = Just $ SubstName v
   isvar _ = Nothing
 
-var = Var . string2Name
-fullType bindList l r =
-  FullType $ bind (fmap string2Name bindlist) (l,r)
-polyType bindList l r =
-  PolyType $ bind (fmap string2Name bindlist) (l,r)
+
+var :: String -> Exp
+var = Atom . string2Name
+full bindList l r =
+  Full $ bind (fmap string2Name bindList) (l,r)
+poly bindList t =
+  Poly $ bind (fmap string2Name bindList) t
 
