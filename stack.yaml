@@ -42,6 +42,7 @@ packages:
 extra-deps:
 - unbound-0.5.1.1@sha256:13bc46f324b63061db1189e45c00e0d332fa0371c95077c4e474d3b94b7dd01d,3248
 - RepLib-0.5.4.1@sha256:f1d0765fbdc55c0905b3b70f1953a440cb8d04b65b3ccd6f067ee0f082f6fa0d,1953
+- data-fix-0.2.0@sha256:d8edf00817e386e0ef6bbb5d2ab75aac4e52e77e95c4ce3c08c0c9c028af3963,887
 
 # Override default flag values for local packages and extra-deps
 flags: {}

@@ -12,7 +12,7 @@
 > import Control.Arrow ((+++))
 > import Control.Monad
 > import Control.Monad.Trans.Maybe
-> import Control.Monad.Trans.Error
+> import Control.Monad.Trans.Except
 >
 > import Text.Parsec hiding ((<|>), Empty)
 > import qualified Text.Parsec.Token as P
@@ -27,7 +27,12 @@ zeroS = Sum []
 oneP :: Prod a
 oneP = Prod []
 
-from
+intToSum :: Int -> TYPE a
+intToSum n =
+  Fix (Right (Prod [(Gro, Sum (f n))]))
+  where
+  f n | n >= 0 = replicate n (Pos, oneP)
+      | otherwise = replicate n (Neg, oneP)
 
-fromRational :: Rational -> TYPE
+fromRational :: Rational -> TYPE a
 fromRational (a :% b) = Prod [(Gro,

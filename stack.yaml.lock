@@ -18,6 +18,13 @@ packages:
       sha256: a343349797e41e579eedab5d01fe01cbbb3f7963eb5e2c2c58ca6bac5a34c9ce
   original:
     hackage: RepLib-0.5.4.1@sha256:f1d0765fbdc55c0905b3b70f1953a440cb8d04b65b3ccd6f067ee0f082f6fa0d,1953
+- completed:
+    hackage: data-fix-0.2.0@sha256:d8edf00817e386e0ef6bbb5d2ab75aac4e52e77e95c4ce3c08c0c9c028af3963,887
+    pantry-tree:
+      size: 207
+      sha256: 3f2bf06a33f235a6960b401271544ac34a9c3d70c2fc2e06aeedf030861c50fa
+  original:
+    hackage: data-fix-0.2.0@sha256:d8edf00817e386e0ef6bbb5d2ab75aac4e52e77e95c4ce3c08c0c9c028af3963,887
 snapshots:
 - completed:
     size: 423845

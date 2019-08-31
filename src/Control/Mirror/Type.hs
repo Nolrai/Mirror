@@ -6,14 +6,17 @@
             , UndecidableInstances
             , NamedFieldPuns
             , GADTSyntax
-            , PatternSynonym
+            , PatternSynonyms
+            , TypeOperators
+            , DeriveFunctor
+            , GeneralizedNewtypeDeriving
+            , DeriveTraversable
    #-}
 
 module Control.Mirror.Type (module Parse) where
 
 import Unbound.LocallyNameless
 import Data.Either (Either(..))
-import Data.Fix
 import Control.Mirror.Type.Parse as Parse
 
 data Sign = Pos | Neg
@@ -22,19 +25,15 @@ data Sigil = Gro | Shr
 
 newtype Sum a = Sum [(Sign, a)]
   deriving (Functor, Traversable, Read, Show, Ord, Eq)
-newtype Prod a = Prod [(Sigil, a)] deriving functor
+newtype Prod a = Prod [(Sigil, a)]
   deriving (Functor, Traversable, Read, Show, Ord, Eq)
 
-newtype O g f where
-  MkO :: a -> f (g a)
 
-newtype Layer a = Layer (Prod (Sum a)) deriving functor
-  deriving (Functor, Traversable, Read, Show, Ord, Eq)
-newtype TYPE a = Layers (Fix (Either a `O` Layer))
+newtype TYPE a = Atom a | PofS Prod (Sum (TYPE a))
   deriving (Functor, Traversable, Read, Show, Ord, Eq)
 
 newtype Var = Var (Name TypeExp)
-  deriving (Functor, Traversable, Read, Show, Ord, Eq, Alpha)
+  deriving (Show, Ord, Eq, Alpha)
 
 newtype TypeExp = TypeExp (TYPE Var)
 newtype PolyType = PolyType (Bind [Var] TypeExp)
@@ -49,10 +48,8 @@ instance Alpha FullType
 instance Alpha Node
 
 instance Subst TypeExp TypeExp where
-  isvar = f . unfix
-    where
-    f (Left (Var v)) = Just (SubstName v)
-    f _ = Nothing
+  isvar (Atom (Var v)) = Just $ SubstName v
+  isvar _ = Nothing
 
 var = Var . string2Name
 fullType bindList l r =
