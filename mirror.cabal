@@ -18,12 +18,14 @@ library
   exposed-modules:     Control.Mirror.Type
                      , Control.Mirror.Parse
                      , Control.Mirror.Type.Parse
-  build-depends:       base >= 4.7 && < 5
-                     , unbound >= 0.5
-                     , pretty >= 1.1 && < 2
-                     , data-fix >= 0.2.0
-                     , parsec >= 3.1
+                     , Control.Mirror
+  build-depends:       base >= 4.7
+                     , unbound-generics >= 0.4
+                     , pretty >= 1.1
+                     , megaparsec
                      , transformers >= 0.4
+                     , containers >= 0.6
+                     , text >= 1.2.3
   default-language:    Haskell2010
 
 executable mirror

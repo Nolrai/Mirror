@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-6.12
+resolver: lts-14.4
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,9 +40,6 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- unbound-0.5.1.1@sha256:13bc46f324b63061db1189e45c00e0d332fa0371c95077c4e474d3b94b7dd01d,3248
-- RepLib-0.5.4.1@sha256:f1d0765fbdc55c0905b3b70f1953a440cb8d04b65b3ccd6f067ee0f082f6fa0d,1953
-- data-fix-0.2.0@sha256:d8edf00817e386e0ef6bbb5d2ab75aac4e52e77e95c4ce3c08c0c9c028af3963,887
 
 # Override default flag values for local packages and extra-deps
 flags: {}
@@ -55,7 +52,8 @@ extra-package-dbs: []
 #
 # Require a specific version of stack, using version ranges
 # require-stack-version: -any # Default
-# require-stack-version: ">=1.1"
+require-stack-version: ">=2.1.3"
+
 #
 # Override the architecture used by stack, especially useful on Windows
 # arch: i386
@@ -66,4 +64,4 @@ extra-package-dbs: []
 # extra-lib-dirs: [/path/to/dir]
 #
 # Allow a newer minor version of GHC than the snapshot specifies
-compiler-check: newer-minor
+# compiler-check: newer-minor
