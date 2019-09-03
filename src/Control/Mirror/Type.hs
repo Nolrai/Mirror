@@ -22,7 +22,6 @@
 module Control.Mirror.Type where
 
 import Unbound.Generics.LocallyNameless
-import Data.Either (Either(..), either)
 import GHC.Generics
 import Data.List
 import Data.String
@@ -53,7 +52,13 @@ data Sum where
   SumExpr :: [(Sign, Product)] -> Sum
   deriving (Eq, Show, Generic)
 
-type TypeExpr = Either Sum Product
+data TypeExpr = SumTypeExpr Sum | ProductTypeExpr Product
+  deriving (Eq, Show, Generic)
+
+onTypeExpr onSum onProduct expr =
+  case expr of
+    SumTypeExpr sum -> onSum sum
+    ProductTypeExpr product -> onProduct product
 
 newtype Poly = Poly (Bind VarSet TypeExpr)
   deriving (Show, Generic)
@@ -65,6 +70,7 @@ instance Alpha Product
 instance Alpha Sum
 instance Alpha Poly
 instance Alpha Full
+instance Alpha TypeExpr
 
 instance forall t. Subst t Sign where
   isvar _ = Nothing
@@ -97,12 +103,12 @@ normalizeProducts (ProductExpr outer) =
 
 instance Subst TypeExpr Product where
   isCoerceVar (ProductVar v) =
-      pure (SubstCoerce v (Just . either toProduct id))
+      pure (SubstCoerce v (Just . onTypeExpr toProduct id))
   isCoerceVar _ = Nothing
 
 instance Subst TypeExpr Sum where
   isCoerceVar (SumVar v) =
-    pure (SubstCoerce v (Just . either id toSum))
+    pure (SubstCoerce v (Just . onTypeExpr id toSum))
   isCoerceVar _ = Nothing
 
 class TypeBody v where
@@ -131,4 +137,4 @@ natToSum :: Natural -> Sum
 natToSum n = SumExpr $ replicate (fromIntegral n) (Pos, oneP)
 
 zeroS :: Sum
-zeroS = SumExpr [] -- = natToSum 0
+zeroS = SumExpr [] -- == natToSum 0
