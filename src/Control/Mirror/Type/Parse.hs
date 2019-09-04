@@ -9,7 +9,8 @@
   #-}
 
 module Control.Mirror.Type.Parse where
-import Control.Mirror.Type
+import Control.Mirror.Type hiding (poly, full)
+import qualified Control.Mirror.Type as Type
 
 import Prelude hiding (sum, product)
 
@@ -22,8 +23,9 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 import qualified Data.Foldable as F
+import Numeric.Natural (Natural)
 
-import Text.Megaparsec
+import Text.Megaparsec as M
 import Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -51,7 +53,7 @@ sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-")
 sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%")
 
 identifier :: Parser String
-identifier = lexeme ( (:) <$> letterChar <*> many (char ';'))
+identifier = lexeme ( (:) <$> letterChar <*> many alphaNumChar)
 
 expr' :: TypeBody b
   => String -> Parser (c,d) -> ([(c, d)] -> b) -> Parser b
@@ -68,10 +70,23 @@ expr' empty item constr =
 product :: Parser Product
 sum :: Parser Sum
 product = expr' "1" factor ProductExpr
-sum     = expr' "0" term SumExpr
+sum     = (natToSum <$> natural) <|> expr' "0" term SumExpr
+  where
+  natural = fromIntegral <$> lexeme L.decimal
 
 typeExpr :: Parser TypeExpr
 typeExpr = fmap SumTypeExpr sum <|> fmap ProductTypeExpr product
+
+polyParser :: Parser Poly
+polyParser = Type.poly <$> squares (many identifier)  <*> typeExpr
+
+fullParser :: Parser Full
+fullParser =
+  Type.full
+    <$> squares (many identifier)
+    <*> typeExpr
+    <* symbol "~>"
+    <*> typeExpr
 
 --- helpers --
 
@@ -79,6 +94,8 @@ lexeme = L.lexeme whiteSpace
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
+
+squares = between (symbol "[") (symbol "]")
 
 symbol :: String -> Parser String
 symbol = L.symbol whiteSpace
@@ -89,36 +106,3 @@ whiteSpace =
     space1
     (L.skipLineComment "##")
     (L.skipBlockCommentNested "(#" "#)")
-
--- Pretty printing. I put this in the same module because they really can't be tested seperately.
-
-class Pretty p where
-  pprint :: (Applicative m, Fresh m) => p -> m Doc
-
-instance Pretty Sum where
-  pprint (SumVar v) = pure . PP.text . show $ v
-  pprint (SumExpr []) = pure $ PP.text "0"
-  pprint (SumExpr [x]) = pprint x
-  pprint (SumExpr l) =
-    PP.parens . F.foldr1 (<+>) <$> sequenceA (pprint <$> l)
-
-instance Pretty Product where
-  pprint (ProductVar v) = pure . PP.text . show $ v
-  pprint (ProductExpr []) = pure $ PP.text "1"
-  pprint (ProductExpr [x]) = pprint x
-  pprint (ProductExpr l) =
-    PP.parens . F.foldr1 (<+>) <$> sequenceA (pprint <$> l)
-
-instance Pretty (Sign, Product) where
-  pprint (sign, product) = (<+>) <$> pprint sign <*> pprint product
-
-instance Pretty (Sigil, Sum) where
-  pprint (sigil, sum) = (<+>) <$> pprint sigil <*> pprint sum
-
-instance Pretty Sign where
-  pprint Pos = pure $ PP.text "+"
-  pprint Neg = pure $ PP.text "-"
-
-instance Pretty Sigil where
-  pprint Gro = pure $ PP.text "*"
-  pprint Shr = pure $ PP.text "%"

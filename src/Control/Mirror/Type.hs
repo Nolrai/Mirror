@@ -17,6 +17,7 @@
             , StandaloneDeriving
             , RebindableSyntax
             , InstanceSigs
+            , MultiWayIf
    #-}
 
 module Control.Mirror.Type where
@@ -25,7 +26,6 @@ import Unbound.Generics.LocallyNameless
 import GHC.Generics
 import Data.List
 import Data.String
-import Numeric.Natural hiding ((+), (*), negate, (-), (/))
 import Prelude hiding ((+), (*), negate, (-), (/))
 import Data.Maybe (Maybe(..))
 import Control.Arrow (second)
@@ -133,8 +133,14 @@ poly bindSet t =
 oneP :: Product
 oneP = ProductExpr []
 
-natToSum :: Natural -> Sum
-natToSum n = SumExpr $ replicate (fromIntegral n) (Pos, oneP)
+natToSum :: Int -> Sum
+natToSum n = SumExpr $ replicate (fromIntegral n') (sign, oneP)
+  where
+    n' = abs n
+    sign =
+      if | n > 0 -> Pos
+         | n < 0 -> Neg
+         | otherwise -> error "zero has no sign"
 
 zeroS :: Sum
 zeroS = SumExpr [] -- == natToSum 0
