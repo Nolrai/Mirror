@@ -4,28 +4,38 @@
            , FlexibleInstances
            , FlexibleContexts
            , UndecidableInstances
+           , NoImplicitPrelude
+           , OverloadedStrings
   #-}
 
 module Control.Mirror.Type.Parse where
 import Control.Mirror.Type
 
-import Data.Text
+import Prelude hiding (sum, product)
 
+import Data.Text as T
+
+import Data.Functor (($>))
 import Control.Applicative hiding (many, some)
 import Control.Arrow ((+++))
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
+import qualified Data.Foldable as F
 
 import Text.Megaparsec
-import Text.Megaparsec.Char
+import Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 import qualified Text.PrettyPrint as PP
 import Text.PrettyPrint (Doc, (<+>))
 
-type Parser = Parsec () Text
-type PError = ParseErrorBundle Text ()
+import Unbound.Generics.LocallyNameless.Fresh as Fr
+import Unbound.Generics.LocallyNameless.LFresh as LFr
+
+-- These are just the defaults for now. The () is where to put custom error info
+type Parser = Parsec () String
+type PError = ParseErrorBundle String ()
 
 -- A sum is composed of terms (or is a variable)
 term :: Parser (Sign, Product)
@@ -38,19 +48,26 @@ factor = (,) <$> sigil <*> sum
 sign :: Parser Sign
 sigil :: Parser Sigil
 sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-")
-sigil = (Grow <$ symbol "*") <|> (Neg <$ symbol "%")
+sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%")
 
-identifier :: Parser Str
-identifier = lexeme ( (:) <$> letterChar <*> many alphaNumChar)
+identifier :: Parser String
+identifier = lexeme ( (:) <$> letterChar <*> many (char ';'))
 
-expr' :: TypeBody b => String -> Parser a -> ([(c, d)] -> b) -> Parser b
-expr' empty item constr = var identifier <|>
-  (constr <$> ((symbol empty $> []) <|> ((\x -> [x]) <$> item) <|> parens (some item)))
+expr' :: TypeBody b
+  => String -> Parser (c,d) -> ([(c, d)] -> b) -> Parser b
+-- A type expresion is either:
+expr' empty item constr =
+  (var <$> identifier) -- a variable
+  <|> (constr <$> -- Or a body
+        ( (symbol empty $> []) -- which in turn is either empty
+        <|> ((\x -> [x]) <$> item) -- one bare item
+        <|> parens (some item) -- or is parentheses around at least 1 items.
+        )
+      )
 
 product :: Parser Product
-product = expr' "1" factor ProductExpr
-
 sum :: Parser Sum
+product = expr' "1" factor ProductExpr
 sum     = expr' "0" term SumExpr
 
 typeExpr :: Parser TypeExpr
@@ -58,44 +75,50 @@ typeExpr = fmap SumTypeExpr sum <|> fmap ProductTypeExpr product
 
 --- helpers --
 
+lexeme = L.lexeme whiteSpace
+
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-parens :: String -> Parser String
+symbol :: String -> Parser String
 symbol = L.symbol whiteSpace
 
-whiteSpace :: Parser String
+whiteSpace :: Parser ()
 whiteSpace =
-  space1
-    (skipLineComment (string "##"))
-    (skipBlockCommentNested (string "(#") (string "#)"))
+  L.space
+    space1
+    (L.skipLineComment "##")
+    (L.skipBlockCommentNested "(#" "#)")
+
+-- Pretty printing. I put this in the same module because they really can't be tested seperately.
 
 class Pretty p where
-  print :: (Applicative m, Fresh m) => p -> m Doc
+  pprint :: (Applicative m, Fresh m) => p -> m Doc
 
-instance Pretty' Sum where
-  print (SumVar v) = pure . PP.text . show $ x
-  print (SumExpr []) = pure $ PP.text "0"
-  print (SumExpr [x]) = print x
-  print (SumExpr l) = PP.parens <$> (foldr1 (<+>) (map print l))
+instance Pretty Sum where
+  pprint (SumVar v) = pure . PP.text . show $ v
+  pprint (SumExpr []) = pure $ PP.text "0"
+  pprint (SumExpr [x]) = pprint x
+  pprint (SumExpr l) =
+    PP.parens . F.foldr1 (<+>) <$> sequenceA (pprint <$> l)
 
-instance Pretty' Product where
-  print (ProductVar v) = pure . PP.text . show $ x
-  print (ProductExpr []) = pure $ PP.text "1"
-  print (ProductExpr [x]) = print x
-  print (ProductExpr l) = PP.parens <$> (foldr1 (<+>) (map print l))
+instance Pretty Product where
+  pprint (ProductVar v) = pure . PP.text . show $ v
+  pprint (ProductExpr []) = pure $ PP.text "1"
+  pprint (ProductExpr [x]) = pprint x
+  pprint (ProductExpr l) =
+    PP.parens . F.foldr1 (<+>) <$> sequenceA (pprint <$> l)
 
-instance Pretty' (Sign, Product) where
-  print (sign, product) = (<+>) <$> print sign <*> print product
+instance Pretty (Sign, Product) where
+  pprint (sign, product) = (<+>) <$> pprint sign <*> pprint product
 
-instance Pretty' (Sigil, Sum) where
-  print (sigil, sum) = (<+>) <$> print sigil <*> print sum
+instance Pretty (Sigil, Sum) where
+  pprint (sigil, sum) = (<+>) <$> pprint sigil <*> pprint sum
 
-instance Pretty' Sign where
-  print Pos = PP.text "+"
-  print Neg = PP.text "-"
+instance Pretty Sign where
+  pprint Pos = pure $ PP.text "+"
+  pprint Neg = pure $ PP.text "-"
 
-instance Pretty' Sigil where
-  print Gro = PP.text "*"
-  print Shr = PP.text "%"
-
+instance Pretty Sigil where
+  pprint Gro = pure $ PP.text "*"
+  pprint Shr = pure $ PP.text "%"
