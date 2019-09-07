@@ -9,8 +9,8 @@
   #-}
 
 module Control.Mirror.Type.Parse where
-import Control.Mirror.Type hiding (poly, full)
-import qualified Control.Mirror.Type as Type
+import Control.Mirror.Type.Internal hiding (poly, full)
+import qualified Control.Mirror.Type.Internal as Type
 
 import Prelude hiding (sum, product)
 
@@ -28,9 +28,6 @@ import Numeric.Natural (Natural)
 import Text.Megaparsec as M
 import Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import qualified Text.PrettyPrint as PP
-import Text.PrettyPrint (Doc, (<+>))
 
 import Unbound.Generics.LocallyNameless.Fresh as Fr
 import Unbound.Generics.LocallyNameless.LFresh as LFr
@@ -77,13 +74,16 @@ sum     = (natToSum <$> natural) <|> expr' "0" term SumExpr
 typeExpr :: Parser TypeExpr
 typeExpr = fmap SumTypeExpr sum <|> fmap ProductTypeExpr product
 
+varSet :: Parser VarSet
+varSet = toVarSet <$> squares (identifier `sepBy` optional (char ','))
+
 polyParser :: Parser Poly
-polyParser = Type.poly <$> squares (many identifier)  <*> typeExpr
+polyParser = Type.poly <$> varSet  <*> typeExpr
 
 fullParser :: Parser Full
 fullParser =
   Type.full
-    <$> squares (many identifier)
+    <$> varSet
     <*> typeExpr
     <* symbol "~>"
     <*> typeExpr

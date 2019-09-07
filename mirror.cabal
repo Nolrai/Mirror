@@ -16,9 +16,11 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Control.Mirror.Type
-                     , Control.Mirror.Parse
-                     , Control.Mirror.Type.Parse
                      , Control.Mirror
+  other-modules:       Control.Mirror.Type.Internal
+                     , Control.Mirror.Type.PrettyPrint
+                     , Control.Mirror.Type.Parse
+                     , Control.Mirror.Parse
   build-depends:       base >= 4.7
                      , unbound-generics >= 0.4
                      , pretty >= 1.1
