@@ -6,6 +6,7 @@
            , UndecidableInstances
            , NoImplicitPrelude
            , OverloadedStrings
+           , GeneralizedNewtypeDeriving
   #-}
 
 module Control.Mirror.Type.Parse where
@@ -32,9 +33,15 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import Unbound.Generics.LocallyNameless.Fresh as Fr
 import Unbound.Generics.LocallyNameless.LFresh as LFr
 
--- These are just the defaults for now. The () is where to put custom error info
+-- These are just the defaults for now.
+-- The () is where custom error info when we have some.
 type Parser = Parsec () String
 type PError = ParseErrorBundle String ()
+
+sign :: Parser Sign
+sigil :: Parser Sigil
+sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-")
+sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%")
 
 -- A sum is composed of terms (or is a variable)
 term :: Parser (Sign, Product)
@@ -44,25 +51,8 @@ term = (,) <$> sign <*> product
 factor :: Parser (Sigil, Sum)
 factor = (,) <$> sigil <*> sum
 
-sign :: Parser Sign
-sigil :: Parser Sigil
-sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-")
-sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%")
-
-identifier :: Parser String
-identifier = lexeme ( (:) <$> letterChar <*> many alphaNumChar)
-
-expr' :: TypeBody b
-  => String -> Parser (c,d) -> ([(c, d)] -> b) -> Parser b
--- A type expresion is either:
-expr' empty item constr =
-  (var <$> identifier) -- a variable
-  <|> (constr <$> -- Or a body
-        ( (symbol empty $> []) -- which in turn is either empty
-        <|> ((\x -> [x]) <$> item) -- one bare item
-        <|> parens (some item) -- or is parentheses around at least 1 items.
-        )
-      )
+identifier :: Parser Identifier
+identifier = Identifier <$> lexeme ( (:) <$> letterChar <*> many alphaNumChar)
 
 product :: Parser Product
 sum :: Parser Sum
@@ -89,6 +79,18 @@ fullParser =
     <*> typeExpr
 
 --- helpers --
+
+expr' :: TypeBody b
+  => String -> Parser (c,d) -> ([(c, d)] -> b) -> Parser b
+-- A type expresion is either:
+expr' empty item constr =
+  (var <$> identifier) -- a variable
+  <|> (constr <$> -- Or a body
+        ( (symbol empty $> []) -- which in turn is either empty
+        <|> ((\x -> [x]) <$> item) -- one bare item
+        <|> parens (some item) -- or is parentheses around at least 1 items.
+        )
+      )
 
 lexeme = L.lexeme whiteSpace
 

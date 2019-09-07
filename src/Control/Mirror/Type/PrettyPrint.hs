@@ -12,9 +12,15 @@ import Text.PrettyPrint (Doc, (<+>))
 
 import qualified Data.Foldable as F
 
+runFreshPrint :: Pretty p => p -> Doc
+runFreshPrint = runLFreshM . pprint
+
 -- Pretty printing of type expresions
 class Pretty p where
   pprint :: (Applicative m, LFresh m) => p -> m Doc
+
+instance Pretty Identifier where
+  pprint = pure . PP.text . unIdent
 
 instance Pretty Sum where
   pprint (SumVar v) = pure . PP.text . show $ v
@@ -55,6 +61,17 @@ instance Pretty Poly where
         (PP.text "=>")
         (pprint bindings)
         (pprint typeExpr)
+
+instance Pretty Full where
+  pprint (Full f) =
+    lunbind f $
+    \ (bindings, (typeExprIn, typeExprOut)) ->
+      abSep
+        (PP.text "=>")
+        (pprint bindings)
+        $ abSep (PP.text "->")
+          (pprint typeExprIn)
+          (pprint typeExprOut)
 
 instance Pretty VarSet where
   pprint l = pprintListSep (PP.text ",") (pprint <$> l)

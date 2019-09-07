@@ -2,7 +2,7 @@
 module Control.Mirror.Type.ParseSpec where
 
 import Control.Mirror.Type.Parse as P
-import Control.Mirror.Type
+import Control.Mirror.Type.Internal as T
 
 import Text.Megaparsec (parseMaybe, parse)
 
@@ -22,10 +22,7 @@ spec = parallel $ do
       it "parses a lone variable" . property $
         \ s ->
           (parse typeExpr "test" (unIdent s))
-            `shouldBe` Right (SumTypeExpr . var $ unIdent s)
-
-newtype Identifier = Identifier {unIdent :: String}
-  deriving (Eq, Ord, Read, Show)
+            `shouldBe` Right (SumTypeExpr . var $ s)
 
 genLetter = oneof [choose ('a', 'z') <|>  choose ('A', 'Z')]
 genDigit = choose ('0','9')

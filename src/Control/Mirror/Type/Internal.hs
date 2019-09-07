@@ -111,19 +111,26 @@ instance Subst TypeExpr Sum where
     pure (SubstCoerce v (Just . onTypeExpr id toSum))
   isCoerceVar _ = Nothing
 
+newtype Identifier =
+  Identifier {unIdent :: String}
+  deriving (Show, Eq, Generic)
+identToName = string2Name . unIdent
+
+instance Alpha Identifier where
+
 class TypeBody v where
-  var :: String -> v
+  var :: Identifier -> v
 
 instance TypeBody Sum where
-  var :: String -> Sum
-  var = SumVar . string2Name
+  var :: Identifier -> Sum
+  var = SumVar . identToName
 
 instance TypeBody Product where
-  var :: String -> Product
-  var = ProductVar . string2Name
+  var :: Identifier -> Product
+  var = ProductVar . identToName
 
-toVarSet :: [String] -> VarSet
-toVarSet s = map string2Name s
+toVarSet :: [Identifier] -> VarSet
+toVarSet s = map identToName s
 
 full bindSet l r =
   Full $ bind bindSet (l,r)
