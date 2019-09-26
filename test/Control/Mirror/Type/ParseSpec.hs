@@ -8,15 +8,14 @@ import Text.Megaparsec (parseMaybe, parse)
 
 import Test.Hspec
 import Test.QuickCheck
-import Data.Maybe (Maybe(Just), isJust)
-import Numeric.Natural (Natural)
+import Data.Maybe (Maybe(Just))
 
 spec = parallel $ do
   describe "The TypeExpr parser" $ do
     it "Parses integers" . property $
         \(x' :: Int) -> let x = abs x' in
           parseMaybe typeExpr (show x)
-          `shouldBe` Just (SumTypeExpr (natToSum x))
+          `shouldBe` Just (normalizeTypeExpr (SumTypeExpr (natToSum x)))
 
     describe "Parses variables" $
       it "parses a lone variable" . property $

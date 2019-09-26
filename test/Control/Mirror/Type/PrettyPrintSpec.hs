@@ -20,8 +20,6 @@ import Unbound.Generics.LocallyNameless
 
 import Test.Hspec
 import Test.QuickCheck
-import Data.Maybe (Maybe(Just), isJust)
-import Numeric.Natural (Natural)
 
 data SomeParse where
   SomeParse :: forall a
@@ -89,11 +87,11 @@ instance Arbitrary Product where
   shrink = genericShrink
 
 instance Arbitrary TypeExpr where
-  arbitrary = oneof
+  arbitrary = normalizeTypeExpr <$> oneof
     [ SumTypeExpr <$> (regenNames =<< arbitrary)
     , ProductTypeExpr <$> (regenNames =<< arbitrary)
     ]
-  shrink = genericShrink
+  shrink x = normalizeTypeExpr <$> genericShrink x
 
 regenNames :: TypeBody b => b -> Gen b
 regenNames = foldNames go
@@ -116,8 +114,17 @@ instance (Arbitrary expr, Alpha expr) => Arbitrary (Bind VarSet expr) where
     bind <$> shuffle v ?? expr -- from lens, (??) :: f (a -> b) -> a -> f b
 
 spec :: Spec
-spec = describe "The Pretty Printer" $ do
-  mapM_ roundTrip allTheFunctions
+spec = do
+  describe "normalizeTypeExpr" $ do
+    idempotent normalizeTypeExpr
+  describe "The TypeExpr arbitrary" $ do
+    it "should be normalized" . property $
+      \ x -> normalizeTypeExpr x `shouldBe` x
+  describe "The Pretty Printer" $ do
+    mapM_ roundTrip allTheFunctions
+
+idempotent f = it "should be idempotent" . property
+  $ \x -> f (f x) `shouldBe` f x
 
 roundTrip :: SomeParse -> Spec
 roundTrip (SomeParse parser parserName typeName) =

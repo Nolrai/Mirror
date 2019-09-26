@@ -1,9 +1,9 @@
 > {-# LANGUAGE MultiParamTypeClasses
->            , TemplateHaskell
 >            , ScopedTypeVariables
 >            , FlexibleInstances
 >            , FlexibleContexts
 >            , UndecidableInstances
+>            , NoImplicitPrelude
 >   #-}
 
-> module Control.Mirror.Parse where
+> module Control.Mirror.Parse () where

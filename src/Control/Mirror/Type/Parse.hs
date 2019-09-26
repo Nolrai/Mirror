@@ -15,23 +15,12 @@ import qualified Control.Mirror.Type.Internal as Type
 
 import Prelude hiding (sum, product)
 
-import Data.Text as T
-
 import Data.Functor (($>))
 import Control.Applicative hiding (many, some)
-import Control.Arrow ((+++))
-import Control.Monad
-import Control.Monad.Trans.Maybe
-import Control.Monad.Trans.Except
-import qualified Data.Foldable as F
-import Numeric.Natural (Natural)
 
 import Text.Megaparsec as M
 import Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import Unbound.Generics.LocallyNameless.Fresh as Fr
-import Unbound.Generics.LocallyNameless.LFresh as LFr
 
 -- These are just the defaults for now.
 -- The () is where custom error info when we have some.
@@ -62,7 +51,8 @@ sum     = (natToSum <$> natural) <|> expr' "0" term SumExpr
   natural = fromIntegral <$> lexeme L.decimal
 
 typeExpr :: Parser TypeExpr
-typeExpr = fmap SumTypeExpr sum <|> fmap ProductTypeExpr product
+typeExpr = normalizeTypeExpr <$>
+  (fmap SumTypeExpr sum <|> fmap ProductTypeExpr product)
 
 varSet :: Parser VarSet
 varSet = toVarSet <$> squares (identifier `sepBy` optional (char ','))

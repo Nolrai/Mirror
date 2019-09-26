@@ -33,7 +33,6 @@ import Prelude hiding ((+), (*), negate, (-), (/))
 import Data.Maybe (Maybe(..))
 import Control.Arrow (second)
 import Control.Monad (mapM)
-import Data.Proxy
 
 data Sign = Pos | Neg
   deriving (Read, Show, Ord, Eq, Enum, Bounded, Generic)
@@ -96,6 +95,7 @@ normalizeSums (SumExpr outer) =
     go ((Pos, ProductExpr [(Gro, SumExpr inner)]) : xs)
       = go (inner ++ xs)
     go (x:xs) = x : go xs
+normalizeSums x@(SumVar _) = x
 
 normalizeProducts :: Product -> Product
 normalizeProducts (ProductExpr outer) =
@@ -105,6 +105,14 @@ normalizeProducts (ProductExpr outer) =
     go ((Gro, SumExpr [(Pos, ProductExpr inner)]) : xs)
       = go (inner ++ xs)
     go (x:xs) = x : go xs
+normalizeProducts x@(ProductVar _) = x
+
+normalizeTypeExpr :: TypeExpr -> TypeExpr
+normalizeTypeExpr (ProductTypeExpr (ProductExpr [(Gro,x)]))
+  = SumTypeExpr $ normalizeSums x
+normalizeTypeExpr (SumTypeExpr (SumExpr [(Pos,x)]))
+  = ProductTypeExpr $ normalizeProducts x
+normalizeTypeExpr x = x
 
 instance Subst TypeExpr Product where
   isCoerceVar (ProductVar v) =
