@@ -20,6 +20,7 @@
             , MultiWayIf
             , TypeFamilies
             , ScopedTypeVariables
+            , TupleSections
    #-}
 
 module Control.Mirror.Type.Internal where
@@ -31,7 +32,8 @@ import Data.String
 import Prelude hiding ((+), (*), negate, (-), (/))
 import Data.Maybe (Maybe(..))
 import Control.Arrow (second)
-import Control.Monad (forM)
+import Control.Monad (mapM)
+import Data.Proxy
 
 data Sign = Pos | Neg
   deriving (Read, Show, Ord, Eq, Enum, Bounded, Generic)
@@ -123,26 +125,33 @@ instance Alpha Identifier where
 
 class TypeBody v where
   varCons :: Name TypeExpr -> v
-  type Piece v
-  exprCons :: [Piece v] -> v
+  type SignLike v
+  type SubExpr v
+  exprCons :: [(SignLike v, SubExpr v)] -> v
   toTypeExpr :: v -> TypeExpr
   foldNames :: Monad m => (Name TypeExpr -> m (Name TypeExpr)) -> v -> m v
 
 var :: TypeBody v => Identifier -> v
 var = varCons . identToName
 
+type Piece v = (SignLike v, SubExpr v)
+
 foldNames'
-  :: forall m v. (Monad m, TypeBody v)
+  :: forall m v. (Monad m, TypeBody v, TypeBody (SubExpr v))
   => (Name TypeExpr -> m (Name TypeExpr))
   -> Either [Piece v] (Name TypeExpr)
+  -> m v
 foldNames' f (Right v) = varCons <$> f v
 -- (the recursion needs to be foldNames, not foldNames')
-foldNames' f (Left l) = exprCons <$> forM l (second foldNames f)
+foldNames' f (Left l) =
+  exprCons
+    <$> (\(sign, subexpr) -> (sign,) <$> foldNames f subexpr) `mapM` l
 
 instance TypeBody Sum where
   varCons :: Name TypeExpr -> Sum
   varCons = SumVar
-  type Piece Sum = (Sign, Product)
+  type SignLike Sum = Sign
+  type SubExpr Sum = Product
   exprCons = SumExpr
   toTypeExpr = SumTypeExpr
   foldNames f (SumVar v) = foldNames' f (Right v)
@@ -151,7 +160,8 @@ instance TypeBody Sum where
 instance TypeBody Product where
   varCons :: Name TypeExpr -> Product
   varCons = ProductVar
-  type Piece Product = (Sigil, Sum)
+  type SignLike Product = Sigil
+  type SubExpr Product = Sum
   exprCons = ProductExpr
   toTypeExpr = ProductTypeExpr
   foldNames f (ProductVar v) = foldNames' f (Right v)

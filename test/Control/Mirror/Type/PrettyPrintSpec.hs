@@ -13,6 +13,7 @@ import Control.Mirror.Type.PrettyPrint as Pr
 import Control.Mirror.Type.Internal as T
 import Control.Mirror.Type.ParseSpec ()
 import Control.Lens.Fold as F
+import Control.Lens.Operators ((??))
 
 import Text.Megaparsec
 import Unbound.Generics.LocallyNameless
@@ -89,12 +90,19 @@ instance Arbitrary Product where
 
 instance Arbitrary TypeExpr where
   arbitrary = oneof
-    [ SumTypeExpr <$> (regenNames <$> arbitrary)
-    , ProductTypeExpr <$> (regenNames <$> arbitrary)
+    [ SumTypeExpr <$> (regenNames =<< arbitrary)
+    , ProductTypeExpr <$> (regenNames =<< arbitrary)
     ]
   shrink = genericShrink
 
-regenNames 
+regenNames :: TypeBody b => b -> Gen b
+regenNames = foldNames go
+  where
+  go n = makeName (name2String n) <$> sized (\s -> choose (0, fromIntegral s `div` 5))
+
+instance Arbitrary Poly where
+  arbitrary = Poly <$> arbitrary
+  shrink = genericShrink
 
 instance Arbitrary Full where
   arbitrary = Full <$> arbitrary
@@ -104,8 +112,8 @@ instance (Arbitrary expr, Alpha expr) => Arbitrary (Bind VarSet expr) where
   arbitrary =
     do
     expr <- arbitrary
-    v <- shuffle =<< sublistOf (toListOf fv expr)
-    pure $ bind v expr
+    v <- sublistOf (toListOf fv expr)
+    bind <$> shuffle v ?? expr -- from lens, (??) :: f (a -> b) -> a -> f b
 
 spec :: Spec
 spec = describe "The Pretty Printer" $ do
