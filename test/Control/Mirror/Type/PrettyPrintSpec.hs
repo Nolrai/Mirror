@@ -2,6 +2,9 @@
            , KindSignatures
            , NoStarIsType
            , GADTs
+           , FlexibleInstances
+           , FlexibleContexts
+           , LambdaCase
 #-}
 module Control.Mirror.Type.PrettyPrintSpec where
 
@@ -9,6 +12,7 @@ import Control.Mirror.Type.Parse as Pa
 import Control.Mirror.Type.PrettyPrint as Pr
 import Control.Mirror.Type.Internal as T
 import Control.Mirror.Type.ParseSpec ()
+import Control.Lens.Fold as F
 
 import Text.Megaparsec
 import Unbound.Generics.LocallyNameless
@@ -28,7 +32,7 @@ allTheFunctions =
   [ SomeParse Pa.sign "sign" "Sign"
   , SomeParse Pa.sigil "sigil" "Sigil"
   , SomeParse Pa.term "term" "(Sign, Product)"
-  , SomeParse Pa.factor "term" "(Sigil, Sum)"
+  , SomeParse Pa.factor "factor" "(Sigil, Sum)"
   , SomeParse Pa.identifier "identifier" "String"
   , SomeParse Pa.sum "sum" "Sum"
   , SomeParse Pa.product "product" "Product"
@@ -38,33 +42,70 @@ allTheFunctions =
   ]
 
 instance Arbitrary Sign where
-  arbitrary = pure Pos <|> pure Neg
+  arbitrary = oneof $ pure <$> [Pos, Neg]
   shrink Neg = [Pos]
   shrink Pos = []
 
 instance Arbitrary Sigil where
-  arbitrary = pure Gro <|> pure Shr
+  arbitrary = oneof $ pure <$> [Gro, Shr]
   shrink Shr = [Gro]
   shrink Gro = []
 
+-- This is ment to generate the same few values
+-- when in a small expresion by using growingElements
+instance Arbitrary (Name a) where
+  arbitrary = oneof $ pure `map` [makeName [c] n | c <- "abcxyz", n <- [0]]
+  shrink = genericShrink
+
+arbitrary_body :: (Arbitrary (Piece b), TypeBody b) => Gen b
+arbitrary_body =
+  scale (max 0) . sized $
+    \case
+    0 -> pure $ exprCons []
+    1 -> oneof [varCons <$> arbitrary, terms]
+    _ -> terms
+    where
+    terms :: (Arbitrary (Piece b), TypeBody b) => Gen b
+    terms = exprCons <$> sized sizedTerms
+    sizedTerms size =
+      do
+      p <- partition size
+      mapM (\s -> resize (s-1) arbitrary) p
+    partition :: Int -> Gen [Int]
+    partition n
+      | n <= 0 = pure []
+      | otherwise =
+        do
+        m <- oneof $ pure `map` [1..n]
+        (m:) <$> partition (n - m)
+
 instance Arbitrary Sum where
+  arbitrary = arbitrary_body
   shrink = genericShrink
 
 instance Arbitrary Product where
+  arbitrary = arbitrary_body
   shrink = genericShrink
 
 instance Arbitrary TypeExpr where
+  arbitrary = oneof
+    [ SumTypeExpr <$> (regenNames <$> arbitrary)
+    , ProductTypeExpr <$> (regenNames <$> arbitrary)
+    ]
   shrink = genericShrink
 
-instance Arbitrary Poly where
-  shrink = genericShrink
+regenNames 
 
 instance Arbitrary Full where
-  arbitrary = genericArbitrary
+  arbitrary = Full <$> arbitrary
   shrink = genericShrink
 
-instance (Arbitrary v, Arbitrary expr) => Arbitrary (Bind v expr) where
-  arbitrary = (\ expr -> bind (fvAny (\x->[x]) expr) expr) <$> arbitrary
+instance (Arbitrary expr, Alpha expr) => Arbitrary (Bind VarSet expr) where
+  arbitrary =
+    do
+    expr <- arbitrary
+    v <- shuffle =<< sublistOf (toListOf fv expr)
+    pure $ bind v expr
 
 spec :: Spec
 spec = describe "The Pretty Printer" $ do

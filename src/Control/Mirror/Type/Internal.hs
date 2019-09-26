@@ -18,6 +18,8 @@
             , RebindableSyntax
             , InstanceSigs
             , MultiWayIf
+            , TypeFamilies
+            , ScopedTypeVariables
    #-}
 
 module Control.Mirror.Type.Internal where
@@ -29,6 +31,7 @@ import Data.String
 import Prelude hiding ((+), (*), negate, (-), (/))
 import Data.Maybe (Maybe(..))
 import Control.Arrow (second)
+import Control.Monad (forM)
 
 data Sign = Pos | Neg
   deriving (Read, Show, Ord, Eq, Enum, Bounded, Generic)
@@ -119,15 +122,40 @@ identToName = string2Name . unIdent
 instance Alpha Identifier where
 
 class TypeBody v where
-  var :: Identifier -> v
+  varCons :: Name TypeExpr -> v
+  type Piece v
+  exprCons :: [Piece v] -> v
+  toTypeExpr :: v -> TypeExpr
+  foldNames :: Monad m => (Name TypeExpr -> m (Name TypeExpr)) -> v -> m v
+
+var :: TypeBody v => Identifier -> v
+var = varCons . identToName
+
+foldNames'
+  :: forall m v. (Monad m, TypeBody v)
+  => (Name TypeExpr -> m (Name TypeExpr))
+  -> Either [Piece v] (Name TypeExpr)
+foldNames' f (Right v) = varCons <$> f v
+-- (the recursion needs to be foldNames, not foldNames')
+foldNames' f (Left l) = exprCons <$> forM l (second foldNames f)
 
 instance TypeBody Sum where
-  var :: Identifier -> Sum
-  var = SumVar . identToName
+  varCons :: Name TypeExpr -> Sum
+  varCons = SumVar
+  type Piece Sum = (Sign, Product)
+  exprCons = SumExpr
+  toTypeExpr = SumTypeExpr
+  foldNames f (SumVar v) = foldNames' f (Right v)
+  foldNames f (SumExpr l) = foldNames' f (Left l)
 
 instance TypeBody Product where
-  var :: Identifier -> Product
-  var = ProductVar . identToName
+  varCons :: Name TypeExpr -> Product
+  varCons = ProductVar
+  type Piece Product = (Sigil, Sum)
+  exprCons = ProductExpr
+  toTypeExpr = ProductTypeExpr
+  foldNames f (ProductVar v) = foldNames' f (Right v)
+  foldNames f (ProductExpr l) = foldNames' f (Left l)
 
 toVarSet :: [Identifier] -> VarSet
 toVarSet s = map identToName s
@@ -147,7 +175,7 @@ natToSum n = SumExpr $ replicate (fromIntegral n') (sign, oneP)
     sign =
       if | n > 0 -> Pos
          | n < 0 -> Neg
-         | otherwise -> error "zero has no sign"
+         | otherwise -> error "zero has no sign" -- should never get triggered
 
 zeroS :: Sum
 zeroS = SumExpr [] -- == natToSum 0
