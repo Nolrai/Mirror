@@ -32,7 +32,6 @@ allTheFunctions =
   , SomeParse Pa.sigil "sigil" "Sigil"
   , SomeParse Pa.term "term" "(Sign, Product)"
   , SomeParse Pa.factor "factor" "(Sigil, Sum)"
-  , SomeParse Pa.identifier "identifier" "String"
   , SomeParse Pa.sum "sum" "Sum"
   , SomeParse Pa.product "product" "Product"
   , SomeParse Pa.typeExpr "typeExpr" "TypeExpr"
@@ -50,18 +49,12 @@ instance Arbitrary Sigil where
   shrink Shr = [Gro]
   shrink Gro = []
 
--- This is ment to generate the same few values
--- when in a small expresion by using growingElements
-instance Arbitrary (Name a) where
-  arbitrary = oneof $ pure `map` [makeName [c] n | c <- "abcxyz", n <- [0]]
-  shrink = genericShrink
-
 arbitrary_body :: (Arbitrary (Piece b), TypeBody b) => Gen b
 arbitrary_body =
   scale (max 0) . sized $
     \case
     0 -> pure $ exprCons []
-    1 -> oneof [varCons <$> arbitrary, terms]
+    1 -> oneof [var <$> arbitrary, terms]
     _ -> terms
     where
     terms :: (Arbitrary (Piece b), TypeBody b) => Gen b
@@ -111,7 +104,7 @@ instance (Arbitrary expr, Alpha expr) => Arbitrary (Bind VarSet expr) where
     do
     expr <- arbitrary
     v <- sublistOf (toListOf fv expr)
-    bind <$> shuffle v ?? expr -- from lens, (??) :: f (a -> b) -> a -> f b
+    bind <$> shuffle v ?? expr -- from lens: (??) :: f (a -> b) -> a -> f b
 
 spec :: Spec
 spec = do
@@ -119,7 +112,13 @@ spec = do
     idempotent normalizeTypeExpr
   describe "The TypeExpr arbitrary" $ do
     it "should be normalized" . property $
-      \ x -> normalizeTypeExpr x `shouldBe` x
+      \ x ->
+        do
+        let y = normalizeTypeExpr x
+        x `shouldBe` y
+
+  describe "The Pretty Printer" $ do
+    roundTripTypeExpr
   describe "The Pretty Printer" $ do
     mapM_ roundTrip allTheFunctions
 
@@ -130,10 +129,27 @@ roundTrip :: SomeParse -> Spec
 roundTrip (SomeParse parser parserName typeName) =
   it message . property $
       \ x ->
-        case parse parser "Pretty Print" (show . runFreshPrint $ x) of
-          Left bundle -> error $ show bundle
+        let showFresh = show . runFreshPrint in
+        case parse parser "Pretty Print" (showFresh x) of
+          Left bundle -> error $ errorBundlePretty bundle
           Right y -> y `shouldSatisfy` (aeq x)
   where
   message = firstPart ++ secondPart
   firstPart = "of " ++ typeName ++ " produces"
   secondPart = " a string " ++ parserName ++ " can parse."
+
+roundTripTypeExpr =
+  it message . property $
+      \ x ->
+        let showFresh = show . runFreshPrint in
+        case parse typeExpr "Pretty Print" (showFresh x) of
+          Left bundle -> error $ errorBundlePretty bundle
+          Right y -> showFresh y `shouldBe` showFresh x
+  where
+  message = firstPart ++ secondPart
+  firstPart = "of TypeExpr produces"
+  secondPart = " a string typeExpr can parse."
+
+instance ShowErrorComponent () where
+  showErrorComponent = const ""
+  errorComponentLen = const 0

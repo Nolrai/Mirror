@@ -3,6 +3,8 @@ module Control.Mirror.Type.ParseSpec where
 
 import Control.Mirror.Type.Parse as P
 import Control.Mirror.Type.Internal as T
+import Unbound.Generics.LocallyNameless
+  (Name, makeName, name2String, name2Integer)
 
 import Text.Megaparsec (parseMaybe, parse)
 
@@ -20,19 +22,15 @@ spec = parallel $ do
     describe "Parses variables" $
       it "parses a lone variable" . property $
         \ s ->
-          (parse typeExpr "test" (unIdent s))
+          (parse typeExpr "test" (show s))
             `shouldBe` Right (SumTypeExpr . var $ s)
 
-genLetter = oneof [choose ('a', 'z') <|>  choose ('A', 'Z')]
-genDigit = choose ('0','9')
+    describe "Names" $
+      it "should have a letter first" . property $
+          \ (s :: Name TypeExpr) -> (head $ show s) `shouldNotBe` '_'
 
-instance Arbitrary Identifier where
-  arbitrary =
-    (\ x xs -> Identifier (x : xs))
-      <$> genLetter
-      <*> listOf (genLetter <|> genDigit)
+instance Arbitrary (Name a) where
+  arbitrary = oneof $ pure `map` [makeName [c] 0 | c <- abcxyz]
+  shrink n = makeName (name2String n) <$> init [0..(name2Integer n)]
 
--- don't use nested.
--- (because a <|> b <|> c will produce strongly biased results,
--- with a twice as likely as b or c)
-a <|> b = oneof [a,b]
+abcxyz = "a"

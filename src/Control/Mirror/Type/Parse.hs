@@ -13,6 +13,8 @@ module Control.Mirror.Type.Parse where
 import Control.Mirror.Type.Internal hiding (poly, full)
 import qualified Control.Mirror.Type.Internal as Type
 
+import Unbound.Generics.LocallyNameless (Name, makeName)
+
 import Prelude hiding (sum, product)
 
 import Data.Functor (($>))
@@ -29,19 +31,24 @@ type PError = ParseErrorBundle String ()
 
 sign :: Parser Sign
 sigil :: Parser Sigil
-sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-")
-sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%")
+sign  = (Pos <$ symbol "+") <|> (Neg <$ symbol "-") <?> "Sign"
+sigil = (Gro <$ symbol "*") <|> (Shr <$ symbol "%") <?> "Sigil"
 
 -- A sum is composed of terms (or is a variable)
 term :: Parser (Sign, Product)
-term = (,) <$> sign <*> product
+term = (,) <$> sign <*> product <?> "term"
 
 -- A product is composed of factors (or is a variable)
 factor :: Parser (Sigil, Sum)
-factor = (,) <$> sigil <*> sum
+factor = (,) <$> sigil <*> sum <?> "factor"
 
-identifier :: Parser Identifier
-identifier = Identifier <$> lexeme ( (:) <$> letterChar <*> many alphaNumChar)
+name :: forall a. Parser (Name a)
+name = lexeme $ makeName <$> prefix <*> option 0 sufix
+  where
+    prefix :: Parser String
+    prefix = some letterChar
+    sufix :: Parser Integer
+    sufix = char '_' *> L.decimal
 
 product :: Parser Product
 sum :: Parser Sum
@@ -51,21 +58,28 @@ sum     = (natToSum <$> natural) <|> expr' "0" term SumExpr
   natural = fromIntegral <$> lexeme L.decimal
 
 typeExpr :: Parser TypeExpr
-typeExpr = normalizeTypeExpr <$>
-  (fmap SumTypeExpr sum <|> fmap ProductTypeExpr product)
+typeExpr =
+  normalizeTypeExpr
+  <$> (fmap SumTypeExpr (try sum) <|> fmap ProductTypeExpr (try product))
+    <?> "Type Expresion"
 
 varSet :: Parser VarSet
-varSet = toVarSet <$> squares (identifier `sepBy` optional (char ','))
+varSet = toVarSet <$> squares (name `sepBy` optional (char ','))
 
 polyParser :: Parser Poly
-polyParser = Type.poly <$> varSet  <*> typeExpr
+polyParser =
+  Type.poly
+    <$> varSet
+    <* symbol suchThat
+    <*> typeExpr
 
 fullParser :: Parser Full
 fullParser =
   Type.full
     <$> varSet
+    <* symbol suchThat
     <*> typeExpr
-    <* symbol "~>"
+    <* symbol to
     <*> typeExpr
 
 --- helpers --
@@ -74,7 +88,7 @@ expr' :: TypeBody b
   => String -> Parser (c,d) -> ([(c, d)] -> b) -> Parser b
 -- A type expresion is either:
 expr' empty item constr =
-  (var <$> identifier) -- a variable
+  (var <$> name) -- a variable
   <|> (constr <$> -- Or a body
         ( (symbol empty $> []) -- which in turn is either empty
         <|> ((\x -> [x]) <$> item) -- one bare item

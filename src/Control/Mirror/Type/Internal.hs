@@ -28,7 +28,6 @@ module Control.Mirror.Type.Internal where
 import Unbound.Generics.LocallyNameless
 import GHC.Generics
 import Data.List
-import Data.String
 import Prelude hiding ((+), (*), negate, (-), (/))
 import Data.Maybe (Maybe(..))
 import Control.Arrow (second)
@@ -112,6 +111,7 @@ normalizeTypeExpr (ProductTypeExpr (ProductExpr [(Gro,x)]))
   = SumTypeExpr $ normalizeSums x
 normalizeTypeExpr (SumTypeExpr (SumExpr [(Pos,x)]))
   = ProductTypeExpr $ normalizeProducts x
+normalizeTypeExpr (ProductTypeExpr (ProductVar v)) = SumTypeExpr (SumVar v)
 normalizeTypeExpr x = x
 
 instance Subst TypeExpr Product where
@@ -124,23 +124,13 @@ instance Subst TypeExpr Sum where
     pure (SubstCoerce v (Just . onTypeExpr id toSum))
   isCoerceVar _ = Nothing
 
-newtype Identifier =
-  Identifier {unIdent :: String}
-  deriving (Show, Eq, Generic)
-identToName = string2Name . unIdent
-
-instance Alpha Identifier where
-
 class TypeBody v where
-  varCons :: Name TypeExpr -> v
+  var :: Name TypeExpr -> v
   type SignLike v
   type SubExpr v
   exprCons :: [(SignLike v, SubExpr v)] -> v
   toTypeExpr :: v -> TypeExpr
   foldNames :: Monad m => (Name TypeExpr -> m (Name TypeExpr)) -> v -> m v
-
-var :: TypeBody v => Identifier -> v
-var = varCons . identToName
 
 type Piece v = (SignLike v, SubExpr v)
 
@@ -149,15 +139,15 @@ foldNames'
   => (Name TypeExpr -> m (Name TypeExpr))
   -> Either [Piece v] (Name TypeExpr)
   -> m v
-foldNames' f (Right v) = varCons <$> f v
+foldNames' f (Right v) = var <$> f v
 -- (the recursion needs to be foldNames, not foldNames')
 foldNames' f (Left l) =
   exprCons
     <$> (\(sign, subexpr) -> (sign,) <$> foldNames f subexpr) `mapM` l
 
 instance TypeBody Sum where
-  varCons :: Name TypeExpr -> Sum
-  varCons = SumVar
+  var :: Name TypeExpr -> Sum
+  var = SumVar
   type SignLike Sum = Sign
   type SubExpr Sum = Product
   exprCons = SumExpr
@@ -166,8 +156,8 @@ instance TypeBody Sum where
   foldNames f (SumExpr l) = foldNames' f (Left l)
 
 instance TypeBody Product where
-  varCons :: Name TypeExpr -> Product
-  varCons = ProductVar
+  var :: Name TypeExpr -> Product
+  var = ProductVar
   type SignLike Product = Sigil
   type SubExpr Product = Sum
   exprCons = ProductExpr
@@ -175,8 +165,8 @@ instance TypeBody Product where
   foldNames f (ProductVar v) = foldNames' f (Right v)
   foldNames f (ProductExpr l) = foldNames' f (Left l)
 
-toVarSet :: [Identifier] -> VarSet
-toVarSet s = map identToName s
+toVarSet :: [Name TypeExpr] -> VarSet
+toVarSet = id
 
 full bindSet l r =
   Full $ bind bindSet (l,r)
@@ -197,3 +187,8 @@ natToSum n = SumExpr $ replicate (fromIntegral n') (sign, oneP)
 
 zeroS :: Sum
 zeroS = SumExpr [] -- == natToSum 0
+
+-- Symbols
+
+suchThat = "=>"
+to = "~>"
