@@ -132,7 +132,8 @@ roundTrip (SomeParse parser parserName typeName) =
         let showFresh = show . runFreshPrint in
         case parse parser "Pretty Print" (showFresh x) of
           Left bundle -> error $ errorBundlePretty bundle
-          Right y -> y `shouldSatisfy` (aeq x)
+          Right y ->
+            (showFresh y `shouldBe` showFresh x)
   where
   message = firstPart ++ secondPart
   firstPart = "of " ++ typeName ++ " produces"

@@ -56,7 +56,7 @@ data Sum where
   deriving (Eq, Show, Generic)
 
 data TypeExpr = SumTypeExpr Sum | ProductTypeExpr Product
-  deriving (Eq, Show, Generic)
+  deriving (Show, Generic)
 
 onTypeExpr onSum onProduct expr =
   case expr of
@@ -113,6 +113,13 @@ normalizeTypeExpr (SumTypeExpr (SumExpr [(Pos,x)]))
   = ProductTypeExpr $ normalizeProducts x
 normalizeTypeExpr (ProductTypeExpr (ProductVar v)) = SumTypeExpr (SumVar v)
 normalizeTypeExpr x = x
+
+instance Eq TypeExpr where
+  a == b = normalizeTypeExpr a === normalizeTypeExpr b
+    where
+    (SumTypeExpr a) === (SumTypeExpr b) = a == b
+    (ProductTypeExpr a) === (ProductTypeExpr b) = a == b
+    _ === _ = False
 
 instance Subst TypeExpr Product where
   isCoerceVar (ProductVar v) =
