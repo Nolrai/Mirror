@@ -9,7 +9,8 @@
            , GeneralizedNewtypeDeriving
   #-}
 
-module Control.Mirror.Type.Parse where
+module Control.Mirror.Type.Parse
+(sign, sigil, term, factor, name, product, typeExpr, varSet, polyParser, fullParser) where
 import Control.Mirror.Type.Internal hiding (poly, full)
 import qualified Control.Mirror.Type.Internal as Type
 
