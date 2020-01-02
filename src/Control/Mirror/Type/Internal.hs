@@ -50,10 +50,34 @@ data Product where
   ProductExpr :: [(Sigil, Sum)] -> Product
   deriving (Eq, Show, Generic)
 
+instance Semigroup Product where
+  x <> y = ProductExpr $ x * y
+    where
+    ProductExpr a     * ProductExpr b    = (a ++ b)
+    a@(ProductVar _)  * ProductExpr b    = (embed a : b)
+    ProductExpr a     * b@(ProductVar _) = (a ++ [embed b])
+    a@(ProductVar _)  * b@(ProductVar _) = [embed a, embed b]
+    embed x = (Gro, toSum x)
+
+instance Monoid Product where
+  mempty = oneP
+
 data Sum where
   SumVar :: Name TypeExpr -> Sum
   SumExpr :: [(Sign, Product)] -> Sum
   deriving (Eq, Show, Generic)
+
+instance Semigroup Sum where
+  x <> y = SumExpr $ x + y
+    where
+    SumExpr a     + SumExpr b    = (a ++ b)
+    a@(SumVar _)  + SumExpr b    = (embed a : b)
+    SumExpr a     + b@(SumVar _) = (a ++ [embed b])
+    a@(SumVar _)  + b@(SumVar _) = [embed a, embed b]
+    embed x = (Pos, toProduct x)
+
+instance Monoid Sum where
+  mempty = zeroS
 
 data TypeExpr = SumTypeExpr Sum | ProductTypeExpr Product
   deriving (Show, Generic)
@@ -175,6 +199,8 @@ instance TypeBody Product where
 toVarSet :: [Name TypeExpr] -> VarSet
 toVarSet = id
 
+full :: VarSet -> TypeExpr -> TypeExpr -> Full
+poly :: VarSet -> TypeExpr -> Poly
 full bindSet l r =
   Full $ bind bindSet (l,r)
 poly bindSet t =
