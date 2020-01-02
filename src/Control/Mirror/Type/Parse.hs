@@ -26,7 +26,7 @@ import Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
 -- These are just the defaults for now.
--- The () is where custom error info when we have some.
+-- The () is where custom error info would go when we have some.
 type Parser = Parsec () String
 type PError = ParseErrorBundle String ()
 
